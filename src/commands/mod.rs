@@ -22,7 +22,7 @@ pub async fn help(
 }
 
 /// Register new commands
-#[poise::command(slash_command, prefix_command, owners_only)]
+#[poise::command(prefix_command, owners_only, hide_in_help)]
 pub async fn register_commands(ctx: Context<'_>) -> Result<(), Error> {
     poise::builtins::register_application_commands_buttons(ctx).await?;
     info!("New commands registered / updated!");

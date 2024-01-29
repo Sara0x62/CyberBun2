@@ -89,3 +89,24 @@ pub async fn update_color_role(
 
     Ok(())
 }
+
+pub async fn get_color_code(
+    mut conn: PoolConnection<Sqlite>,
+    uid: u64, guid: u64
+) -> Result<u32, Error> {
+
+    let result = sqlx::query(
+        r#"
+        SELECT color
+        FROM colors
+        WHERE uid = ? AND guid = ?
+        "#)
+        .bind(uid as i64)
+        .bind(guid as i64)
+        .fetch_one(&mut *conn)
+        .await?;
+
+    conn.close().await?;
+
+    return Ok(result.get::<u32, _>("color"));
+}
