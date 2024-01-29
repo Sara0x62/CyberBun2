@@ -14,7 +14,6 @@ pub async fn event_handler (
     match event {
 
         FullEvent::Ready { data_about_bot } => {
-
             info!("Bot ready! - serving {} server(s)...", data_about_bot.guilds.len());
             ctx.set_activity( 
                 Some(

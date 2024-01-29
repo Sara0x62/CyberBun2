@@ -19,7 +19,10 @@ pub async fn build_colors(mut conn: PoolConnection<Sqlite>) -> Result<(), Error>
 
     conn.close().await?;
 
-    info!("building 'colors' table - Result: {:?}", result);
+    match result.rows_affected() {
+        0 => info!("Database already exists"),
+        _ => info!("Database created successfully."),
+    }
 
     Ok(())
 }

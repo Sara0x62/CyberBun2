@@ -39,6 +39,9 @@ async fn main() {
 
     let commands = vec![
         commands::help(),
+        commands::register_commands(),
+
+        commands::colors::color(),
     ];
 
     let options = poise::FrameworkOptions {
