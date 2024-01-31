@@ -1,5 +1,5 @@
-use crate::db_handlers::starboard_handlers::{insert_message, message_exists};
-use crate::db_handlers::{color_handlers::get_color, starboard_handlers};
+use crate::db_handlers::starboard_handlers::{insert_message, message_exists, get_guild_settings};
+use crate::db_handlers::color_handlers::get_color;
 use poise::serenity_prelude::{CreateEmbedFooter, CreateMessage};
 use poise::{
     serenity_prelude::{
@@ -88,71 +88,68 @@ pub async fn event_handler(
             // if all set and enabled and 3 stars post to starboard
             // Also ignore if star is inside the starboard channel
 
-            match add_reaction.guild_id {
-                Some(guild) => {
-                    let star = ReactionType::from('⭐');
+            if let Some(guild) = add_reaction.guild_id {
+                let star = ReactionType::from('⭐');
 
-                    if add_reaction.emoji == star {
-                        let message = &ctx
-                            .http
-                            .get_message(add_reaction.channel_id, add_reaction.message_id)
-                            .await?;
+                if add_reaction.emoji == star {
+                    let message = &ctx
+                        .http
+                        .get_message(add_reaction.channel_id, add_reaction.message_id)
+                        .await?;
 
+                    let star_count = message
+                        .reactions
+                        .iter()
+                        .find(|f| f.reaction_type == star && f.count == 1)
+                        .is_some();
+
+                    let conn = data.pool.acquire().await?;
+                    let exists = message_exists(conn, message.id.get()).await?;
+
+                    if star_count && !exists
+                    {
+                        // Try to find guild, starboard related settings
                         let conn = data.pool.acquire().await?;
+                        let settings = get_guild_settings(conn, guild.get()).await?;
 
-                        if message
-                            .reactions
-                            .iter()
-                            .find(|f| f.reaction_type == star && f.count == 1)
-                            .is_some()
-                            && !message_exists(conn, message.id.get()).await?
-                        {
-                            // Try to find guild, starboard related settings
-                            let conn = data.pool.acquire().await?;
-                            let settings =
-                                starboard_handlers::get_guild_settings(conn, guild.get()).await?;
-                            match settings {
-                                Some(settings) => {
-                                    if settings.starboard_enabled
-                                        && settings.starboard_channel.is_some()
-                                    {
-                                        if settings.starboard_channel.unwrap()
-                                            != add_reaction.channel_id.get()
-                                        {
-                                            let starboard = ChannelId::from(
-                                                settings.starboard_channel.unwrap(),
-                                            );
-                                            let user = &message.author;
-                                            let nick = message
-                                                .author_nick(&ctx.http)
-                                                .await
-                                                .unwrap_or(user.name.clone());
-                                            let footer = CreateEmbedFooter::new(format!("CyberBun - ⭐"));
+                        if let Some(settings) = settings {
+                            if settings.starboard_enabled && settings.starboard_channel.is_some()
+                            {
+                                let star_channel = settings.starboard_channel.unwrap();
 
-                                            let msg = CreateEmbed::default()
-                                                .title(nick)
-                                                .url(message.link())
-                                                .thumbnail(
-                                                    user.avatar_url().unwrap_or("".to_string()),
-                                                )
-                                                .description(&message.content)
-                                                .footer(footer)
-                                                .timestamp(Timestamp::now());
-                                            let reply = CreateMessage::default().embed(msg);
+                                if star_channel != add_reaction.channel_id.get()
+                                {
+                                    let starboard = ChannelId::from(
+                                        star_channel
+                                    );
 
-                                            let conn = data.pool.acquire().await?;
-                                            insert_message(conn, message.id.get()).await?;
+                                    let user = &message.author;
+                                    let nick = message
+                                        .author_nick(&ctx.http)
+                                        .await
+                                        .unwrap_or(user.name.clone());
+                                    let footer = CreateEmbedFooter::new(format!("CyberBun - ⭐"));
 
-                                            starboard.send_message(&ctx.http, reply).await?;
-                                        }
-                                    }
+                                    let msg = CreateEmbed::default()
+                                        .title(nick)
+                                        .url(message.link())
+                                        .thumbnail(
+                                            user.avatar_url().unwrap_or("".to_string()),
+                                        )
+                                        .description(&message.content)
+                                        .footer(footer)
+                                        .timestamp(Timestamp::now());
+                                    let reply = CreateMessage::default().embed(msg);
+
+                                    let conn = data.pool.acquire().await?;
+                                    insert_message(conn, message.id.get()).await?;
+
+                                    starboard.send_message(&ctx.http, reply).await?;
                                 }
-                                None => {}
-                            };
+                            }
                         }
                     }
                 }
-                None => {}
             }
         }
 
