@@ -2,6 +2,7 @@ use super::{Context, Error};
 use tracing::info;
 
 pub mod colors;
+pub mod starboard;
 
 /// Show the HELP menu
 #[poise::command(prefix_command, track_edits, slash_command)]

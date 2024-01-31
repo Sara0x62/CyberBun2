@@ -20,17 +20,55 @@ pub async fn build_colors(mut conn: PoolConnection<Sqlite>) -> Result<(), Error>
     conn.close().await?;
 
     match result.rows_affected() {
-        0 => info!("Database already exists"),
-        _ => info!("Database created successfully."),
+        0 => info!("Colors Database already exists"),
+        _ => info!("Colors Database created successfully."),
     }
 
     Ok(())
 }
 
-pub async fn build_moderation() {
-    ()
+pub async fn build_guild_settings(mut conn: PoolConnection<Sqlite>) -> Result<(), Error> {
+    // Table for all the guild related settings - eg Starboard enabled, Starboard channel, ...
+
+    let result = sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS guild_settings (
+            guild_id BIG INT PRIMARY KEY NOT NULL,
+            starboard_enabled BOOLEAN NOT NULL,
+            starboard_channel BIG INT
+        );
+        "#)
+        .execute(&mut *conn)
+        .await?;
+
+    conn.close().await?;
+    
+    match result.rows_affected() {
+        0 => info!("Guild settings Database already exists"),
+        _ => info!("Guild settings Database created successfully."),
+    }
+
+
+    Ok(())
 }
 
-pub async fn build_bugs() {
-    ()
+pub async fn build_starred_messages(mut conn: PoolConnection<Sqlite>) -> Result<(), Error> {
+
+    let result = sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS starred_messages (
+            msg_id BIG INT PRIMARY KEY NOT NULL
+        );
+        "#)
+        .execute(&mut *conn)
+        .await?;
+
+    conn.close().await?;
+
+    match result.rows_affected() {
+        0 => info!("Starred messages Database already exists"),
+        _ => info!("Starred messages Database created successfully."),
+    }
+
+    Ok(())
 }

@@ -42,6 +42,8 @@ async fn main() {
         commands::register_commands(),
 
         commands::colors::color(),
+
+        commands::starboard::starboard(),
     ];
 
     let options = poise::FrameworkOptions {
@@ -109,6 +111,12 @@ async fn db_setup() -> Result<SqlitePool, Error> {
 
     let conn = pool.acquire().await?;
     build_db::build_colors(conn).await?;
+    
+    let conn = pool.acquire().await?;
+    build_db::build_guild_settings(conn).await?;
+
+    let conn = pool.acquire().await?;
+    build_db::build_starred_messages(conn).await?;
 
     info!("Database pool ready");
 

@@ -1,6 +1,6 @@
 use super::super::Error;
-use sqlx::{pool::PoolConnection, Row, Sqlite};
-use tracing::{info, warn};
+use sqlx::{pool::PoolConnection, Sqlite};
+use tracing::info;
 
 #[derive(sqlx::FromRow)]
 pub struct ColorRow {
@@ -19,6 +19,7 @@ pub async fn create_color_role(
     color: u32,
     name: String,
 ) -> Result<(), Error> {
+
     let result = sqlx::query(
         r#"
         INSERT INTO colors (
@@ -48,6 +49,7 @@ pub async fn get_color(
     uid: u64,
     guid: u64,
 ) -> Result<Option<ColorRow>, Error> {
+
     #[derive(sqlx::FromRow)]
     struct TempColor {
         role_id: i64,
@@ -67,24 +69,16 @@ pub async fn get_color(
     .bind(uid as i64)
     .bind(guid as i64)
     .fetch_optional(&mut *conn)
-    .await?;
+    .await?
+    .map(|r| ColorRow {
+        role_id: r.role_id as u64,
+        uid: r.uid as u64,
+        guid: r.guid as u64,
+        color: r.color,
+        role_name: r.role_name,
+    });
 
-    conn.close().await?;
-
-    match result {
-        Some(result) => {
-            return Ok(Some(ColorRow {
-                role_id: result.role_id as u64,
-                uid: result.uid as u64,
-                guid: result.guid as u64,
-                color: result.color,
-                role_name: result.role_name,
-            }))
-        }
-        None => {}
-    };
-
-    Ok(None)
+    Ok(result)
 }
 
 pub async fn update_color_role(
@@ -92,7 +86,8 @@ pub async fn update_color_role(
     role_id: u64,
     color: u32,
 ) -> Result<(), Error> {
-    let result = sqlx::query(
+    
+    let _result = sqlx::query(
         r#"
         UPDATE colors
         set color = ?
