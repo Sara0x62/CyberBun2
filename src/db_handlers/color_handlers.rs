@@ -78,6 +78,8 @@ pub async fn get_color(
         role_name: r.role_name,
     });
 
+    conn.close().await?;
+
     Ok(result)
 }
 
@@ -96,6 +98,29 @@ pub async fn update_color_role(
     )
     .bind(color)
     .bind(role_id as i64)
+    .execute(&mut *conn)
+    .await?;
+
+    conn.close().await?;
+
+    Ok(())
+}
+
+pub async fn update_color_role_id(
+    mut conn: PoolConnection<Sqlite>,
+    old_role_id: u64,
+    new_role_id: u64) 
+-> Result<(), Error> {
+
+    let _result = sqlx::query(
+        r#"
+        UPDATE colors
+        set role_id = ?
+        WHERE role_id = ?;
+        "#,
+    )
+    .bind(new_role_id as i64)
+    .bind(old_role_id as i64)
     .execute(&mut *conn)
     .await?;
 

@@ -156,14 +156,27 @@ async fn insert_or_update_color(ctx: Context<'_>, color: u32) -> Result<(), Erro
 
     match color_role {
         Some(color_role) => {
+            let mut color_id = color_role.role_id;
             // Color role exists ; edit color
             update_color_role(conn, color_role.role_id, color).await?;
-            guild
-                .edit_role(&ctx.http(), color_role.role_id, new_role)
-                .await?;
+
+            // Try to edit guild role
+            let res = guild
+                .edit_role(&ctx.http(), color_role.role_id, new_role.clone())
+                .await;
+
+            if res.is_err() {
+                // Role no longer seems to exist in the guild? - Try to create it instead then
+                let result = guild.create_role(&ctx.http(), new_role).await?;
+
+                // Update new ID in db
+                let conn = ctx.data().pool.acquire().await?;
+                update_color_role_id(conn, color_role.role_id, result.id.get()).await?;
+                color_id = result.id.get();
+            }
 
             let mem = guild.member(&ctx.http(), uid).await?;
-            mem.add_role(&ctx.http(), color_role.role_id).await?;
+            mem.add_role(&ctx.http(), color_id).await?;
 
             let reply = CreateReply::default()
                 .content("Color Updated!")
