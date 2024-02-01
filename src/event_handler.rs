@@ -97,16 +97,10 @@ pub async fn event_handler(
                         .get_message(add_reaction.channel_id, add_reaction.message_id)
                         .await?;
 
-                    let star_count = message
-                        .reactions
-                        .iter()
-                        .find(|f| f.reaction_type == star && f.count == 1)
-                        .is_some();
-
                     let conn = data.pool.acquire().await?;
                     let exists = message_exists(conn, message.id.get()).await?;
 
-                    if star_count && !exists
+                    if !exists
                     {
                         // Try to find guild, starboard related settings
                         let conn = data.pool.acquire().await?;
@@ -115,19 +109,22 @@ pub async fn event_handler(
                         if let Some(settings) = settings {
                             if settings.starboard_enabled && settings.starboard_channel.is_some()
                             {
+                                let star_count = message
+                                    .reactions
+                                    .iter()
+                                    .find(|f| f.reaction_type == star && f.count == settings.starboard_min as u64)
+                                    .is_some();
+
                                 let star_channel = settings.starboard_channel.unwrap();
 
-                                if star_channel != add_reaction.channel_id.get()
+                                if star_channel != add_reaction.channel_id.get() && star_count
                                 {
                                     let starboard = ChannelId::from(
                                         star_channel
                                     );
 
                                     let user = &message.author;
-                                    let nick = message
-                                        .author_nick(&ctx.http)
-                                        .await
-                                        .unwrap_or(user.name.clone());
+                                    let nick = message.author_nick(&ctx.http).await.unwrap_or(user.name.clone());
                                     let footer = CreateEmbedFooter::new(format!("CyberBun - ⭐"));
 
                                     let msg = CreateEmbed::default()

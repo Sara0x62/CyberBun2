@@ -35,7 +35,8 @@ pub async fn build_guild_settings(mut conn: PoolConnection<Sqlite>) -> Result<()
         CREATE TABLE IF NOT EXISTS guild_settings (
             guild_id BIG INT PRIMARY KEY NOT NULL,
             starboard_enabled BOOLEAN NOT NULL,
-            starboard_channel BIG INT
+            starboard_channel BIG INT,
+            starboard_min SMALL INT NOT NULL
         );
         "#)
         .execute(&mut *conn)
