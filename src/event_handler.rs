@@ -24,6 +24,8 @@ pub async fn event_handler(
                 "Bot ready! - serving {} server(s)...",
                 data_about_bot.guilds.len()
             );
+            data.server_count.store(data_about_bot.guilds.len(), SeqCst);
+            
             ctx.set_activity(Some(ActivityData::watching(format!(
                 "{} server(s) - OwO",
                 data_about_bot.guilds.len()
