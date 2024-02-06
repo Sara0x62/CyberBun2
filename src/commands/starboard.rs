@@ -59,6 +59,8 @@ pub async fn setup(
     Ok(())
 }
 
+
+/// Toggles the status on the starboard to enabled or disabled
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
 pub async fn enabled(
     ctx: Context<'_>,
@@ -87,6 +89,8 @@ pub async fn enabled(
     Ok(())
 }
 
+
+/// Set the required stars for the starboard
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
 pub async fn stars(
     ctx: Context<'_>,

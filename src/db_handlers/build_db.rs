@@ -73,3 +73,29 @@ pub async fn build_starred_messages(mut conn: PoolConnection<Sqlite>) -> Result<
 
     Ok(())
 }
+
+pub async fn build_reminders(mut conn: PoolConnection<Sqlite>) -> Result<(), Error> {
+    let result = sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS reminders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp BIG INT NOT NULL,
+            message TEXT NOT NULL,
+            user_id BIG INT NOT NULL,
+            channel_id BIG INT NOT NULL,
+            private BOOLEAN NOT NULL,
+            completed BOOLEAN NOT NULL
+        )
+        "#)
+        .execute(&mut *conn)
+        .await?;
+
+    conn.close().await?;
+
+    match result.rows_affected() {
+        0 => info!("Reminders Database already exists"),
+        _ => info!("Reminders Database created successfully."),
+    }
+
+    Ok(())
+}

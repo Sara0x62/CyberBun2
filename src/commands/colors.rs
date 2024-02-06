@@ -14,6 +14,7 @@ pub async fn color(_ctx: Context<'_>) -> Result<(), Error> {
 }
 
 
+/// Some basic help related to the color commands
 #[poise::command(slash_command, ephemeral, guild_only)]
 pub async fn help(ctx: Context<'_>) -> Result<(), Error> {
     // Display any other roles the user might have that are ranked above the color role.
@@ -37,6 +38,7 @@ pub async fn help(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+/// Setting a new color for yourself
 #[poise::command(slash_command, ephemeral, guild_only)]
 pub async fn set(
     ctx: Context<'_>,
@@ -57,6 +59,8 @@ pub async fn set(
     Ok(())
 }
 
+
+/// Color info on a given person or yourself if none given
 #[poise::command(slash_command, guild_only)]
 pub async fn info(
     ctx: Context<'_>,
@@ -99,6 +103,8 @@ pub async fn info(
     Ok(())
 }
 
+
+/// Steal another user's color
 #[poise::command(slash_command, guild_only)]
 pub async fn steal(
     ctx: Context<'_>,

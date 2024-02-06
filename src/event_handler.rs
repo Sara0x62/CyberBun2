@@ -1,14 +1,20 @@
-use crate::db_handlers::starboard_handlers::{insert_message, message_exists, get_guild_settings};
 use crate::db_handlers::color_handlers::get_color;
-use poise::serenity_prelude::{CreateEmbedFooter, CreateMessage};
+use crate::db_handlers::reminder_handlers::{get_expired_reminders, set_completed, Reminder};
+use crate::db_handlers::starboard_handlers::{get_guild_settings, insert_message, message_exists};
+use poise::serenity_prelude::{CreateEmbedFooter, CreateMessage, Mentionable, UserId};
 use poise::{
     serenity_prelude::{
         ActivityData, ChannelId, Context, CreateEmbed, FullEvent, ReactionType, Timestamp,
     },
     FrameworkContext,
 };
+use sqlx::{Error as sqlError, Pool};
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::Arc;
 use tracing::info;
+use tokio::time::Duration;
+
+use sqlx::{pool::PoolConnection, Sqlite};
 
 use super::{Data, Error};
 
@@ -19,18 +25,38 @@ pub async fn event_handler(
     data: &Data,
 ) -> Result<(), Error> {
     match event {
+
         FullEvent::Ready { data_about_bot } => {
             info!(
                 "Bot ready! - serving {} server(s)...",
                 data_about_bot.guilds.len()
             );
             data.server_count.store(data_about_bot.guilds.len(), SeqCst);
-            
+
             ctx.set_activity(Some(ActivityData::watching(format!(
                 "{} server(s) - OwO",
                 data_about_bot.guilds.len()
             ))));
         }
+
+        FullEvent::CacheReady { guilds: _ } => {
+            let reminder_ctx = Arc::new(ctx.clone());
+            let pool = Arc::from(data.pool.clone());
+            
+            tokio::spawn(async move {
+                loop {
+                    // Reminders event -
+                    // Check Database for first upcoming reminder
+                    let status = reminder_handler(&reminder_ctx, &pool).await;
+                    
+                    match status {
+                        Ok(_) => continue,
+                        Err(err) => info!("Error occured in reminder loop - {}", err)
+                    }
+                    tokio::time::sleep(Duration::from_secs(30)).await;
+                }
+            });
+        } 
 
         FullEvent::GuildCreate { guild: _, is_new } => match is_new {
             Some(true) => {
@@ -48,10 +74,7 @@ pub async fn event_handler(
             _ => (),
         },
 
-        FullEvent::GuildDelete {
-            incomplete,
-            full: _,
-        } => {
+        FullEvent::GuildDelete { incomplete, full: _, } => {
             let new_count = data.server_count.load(SeqCst) - 1;
             data.server_count.store(new_count, SeqCst);
 
@@ -102,39 +125,38 @@ pub async fn event_handler(
                     let conn = data.pool.acquire().await?;
                     let exists = message_exists(conn, message.id.get()).await?;
 
-                    if !exists
-                    {
+                    if !exists {
                         // Try to find guild, starboard related settings
                         let conn = data.pool.acquire().await?;
                         let settings = get_guild_settings(conn, guild.get()).await?;
 
                         if let Some(settings) = settings {
-                            if settings.starboard_enabled && settings.starboard_channel.is_some()
-                            {
+                            if settings.starboard_enabled && settings.starboard_channel.is_some() {
                                 let star_count = message
                                     .reactions
                                     .iter()
-                                    .find(|f| f.reaction_type == star && f.count == settings.starboard_min as u64)
+                                    .find(|f| {
+                                        f.reaction_type == star
+                                            && f.count == settings.starboard_min as u64
+                                    })
                                     .is_some();
 
                                 let star_channel = settings.starboard_channel.unwrap();
 
-                                if star_channel != add_reaction.channel_id.get() && star_count
-                                {
-                                    let starboard = ChannelId::from(
-                                        star_channel
-                                    );
+                                if star_channel != add_reaction.channel_id.get() && star_count {
+                                    let starboard = ChannelId::from(star_channel);
 
                                     let user = &message.author;
-                                    let nick = message.author_nick(&ctx.http).await.unwrap_or(user.name.clone());
+                                    let nick = message
+                                        .author_nick(&ctx.http)
+                                        .await
+                                        .unwrap_or(user.name.clone());
                                     let footer = CreateEmbedFooter::new(format!("CyberBun - ⭐"));
 
                                     let msg = CreateEmbed::default()
                                         .title(nick)
                                         .url(message.link())
-                                        .thumbnail(
-                                            user.avatar_url().unwrap_or("".to_string()),
-                                        )
+                                        .thumbnail(user.avatar_url().unwrap_or("".to_string()))
                                         .description(&message.content)
                                         .footer(footer)
                                         .timestamp(Timestamp::now());
@@ -155,5 +177,27 @@ pub async fn event_handler(
         _ => (),
     }
 
+    Ok(())
+}
+
+async fn reminder_handler(ctx: &Context, pool: &Arc<Pool<Sqlite>>) -> Result<(), Error> {
+    // First load all reminders from database that;
+    // - have not been completed yet
+    // - Have timestamps equal to 'now' or already in the 'past'
+    let conn = pool.acquire().await;
+    let reminders: Vec<Reminder> = get_expired_reminders(conn.unwrap()).await?;
+
+    for r in reminders.iter() {
+        let user = UserId::from(r.user_id);
+        let message = CreateMessage::new().content(
+            format!("{} - Reminder; {}", user.mention(), r.message));
+
+        let chan = ChannelId::from(r.channel_id);
+        chan.send_message(&ctx.http, message).await?;
+
+        let conn = pool.acquire().await;
+        let _ = set_completed(conn.unwrap(), r.id).await;
+    }
+    
     Ok(())
 }

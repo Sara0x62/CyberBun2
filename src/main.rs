@@ -40,10 +40,13 @@ async fn main() {
     let commands = vec![
         commands::help(),
         commands::register_commands(),
+        commands::sysinfo(),
 
         commands::colors::color(),
 
         commands::starboard::starboard(),
+
+        commands::reminders::remindme(),
     ];
 
     let options = poise::FrameworkOptions {
@@ -117,6 +120,9 @@ async fn db_setup() -> Result<SqlitePool, Error> {
 
     let conn = pool.acquire().await?;
     build_db::build_starred_messages(conn).await?;
+
+    let conn = pool.acquire().await?;
+    build_db::build_reminders(conn).await?;
 
     info!("Database pool ready");
 
