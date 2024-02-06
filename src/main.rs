@@ -106,7 +106,7 @@ async fn db_setup() -> Result<SqlitePool, Error> {
     }
 
     let pool = SqlitePoolOptions::new()
-        .max_connections(5)
+        .max_connections(10)
         .connect(&db_url)
         .await?;
 
