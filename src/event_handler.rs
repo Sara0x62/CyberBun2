@@ -40,10 +40,11 @@ pub async fn event_handler(
         }
 
         FullEvent::CacheReady { guilds: _ } => {
-            let reminder_ctx = Arc::new(ctx.clone());
-            let pool = Arc::from(data.pool.clone());
 
             if !data.reminder_task_running.load(SeqCst) {
+                let reminder_ctx = Arc::new(ctx.clone());
+                let pool = Arc::from(data.pool.clone());
+
                 data.reminder_task_running.store(true, SeqCst);
                 tokio::spawn(async move {
                     loop {
