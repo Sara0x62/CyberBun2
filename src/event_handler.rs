@@ -8,13 +8,13 @@ use poise::{
     },
     FrameworkContext,
 };
-use sqlx::{Error as sqlError, Pool};
+use sqlx::Pool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use tracing::info;
 use tokio::time::Duration;
 
-use sqlx::{pool::PoolConnection, Sqlite};
+use sqlx::Sqlite;
 
 use super::{Data, Error};
 
@@ -42,20 +42,23 @@ pub async fn event_handler(
         FullEvent::CacheReady { guilds: _ } => {
             let reminder_ctx = Arc::new(ctx.clone());
             let pool = Arc::from(data.pool.clone());
-            
-            tokio::spawn(async move {
-                loop {
-                    // Reminders event -
-                    // Check Database for first upcoming reminder
-                    let status = reminder_handler(&reminder_ctx, &pool).await;
-                    
-                    match status {
-                        Ok(_) => continue,
-                        Err(err) => info!("Error occured in reminder loop - {}", err)
+
+            if !data.reminder_task_running.load(SeqCst) {
+                data.reminder_task_running.store(true, SeqCst);
+                tokio::spawn(async move {
+                    loop {
+                        // Reminders event -
+                        // Check Database for first upcoming reminder
+                        let status = reminder_handler(&reminder_ctx, &pool).await;
+                        
+                        match status {
+                            Ok(_) => continue,
+                            Err(err) => info!("Error occured in reminder loop - {}", err)
+                        }
+                        tokio::time::sleep(Duration::from_secs(30)).await;
                     }
-                    tokio::time::sleep(Duration::from_secs(30)).await;
-                }
-            });
+                });
+            }
         } 
 
         FullEvent::GuildCreate { guild: _, is_new } => match is_new {
@@ -184,8 +187,8 @@ async fn reminder_handler(ctx: &Context, pool: &Arc<Pool<Sqlite>>) -> Result<(),
     // First load all reminders from database that;
     // - have not been completed yet
     // - Have timestamps equal to 'now' or already in the 'past'
-    let conn = pool.acquire().await;
-    let reminders: Vec<Reminder> = get_expired_reminders(conn.unwrap()).await?;
+    let conn = pool.acquire().await?;
+    let reminders: Vec<Reminder> = get_expired_reminders(conn).await?;
 
     for r in reminders.iter() {
         let user = UserId::from(r.user_id);
@@ -195,8 +198,8 @@ async fn reminder_handler(ctx: &Context, pool: &Arc<Pool<Sqlite>>) -> Result<(),
         let chan = ChannelId::from(r.channel_id);
         chan.send_message(&ctx.http, message).await?;
 
-        let conn = pool.acquire().await;
-        let _ = set_completed(conn.unwrap(), r.id).await;
+        let conn = pool.acquire().await?;
+        set_completed(conn, r.id).await?;
     }
     
     Ok(())

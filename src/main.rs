@@ -1,4 +1,4 @@
-use std::{env, sync::atomic::AtomicUsize};
+use std::{env, sync::atomic::{AtomicBool, AtomicUsize}};
 use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePoolOptions, SqlitePool};
 use tracing::info;
 use tracing_subscriber::{fmt, EnvFilter, prelude::*};
@@ -14,7 +14,11 @@ use crate::db_handlers::build_db;
 
 
 // == GLOBAL DATA ==
-struct Data { server_count: AtomicUsize, pool: SqlitePool } // User data, which is stored and accessible in all command invocations
+struct Data { 
+    server_count: AtomicUsize, 
+    pool: SqlitePool, 
+    reminder_task_running: AtomicBool
+} // User data, which is stored and accessible in all command invocations
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
@@ -71,6 +75,7 @@ async fn main() {
                 Ok(Data {
                     server_count: AtomicUsize::new(0),
                     pool,
+                    reminder_task_running: AtomicBool::new(false),
                 })
             })
         })

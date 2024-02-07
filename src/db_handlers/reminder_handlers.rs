@@ -26,7 +26,7 @@ pub async fn get_expired_reminders(
     
     let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("Error, time went backwards").as_secs();
 
-    let mut rows = sqlx::query(
+    let rows = sqlx::query(
         r#"
         SELECT id, timestamp, message, user_id, channel_id, private FROM reminders
         WHERE completed = 0 AND timestamp <= ?;
@@ -61,7 +61,7 @@ pub async fn set_completed (
     id: u64
 ) -> Result<(), Error> {
 
-    let mut rows = sqlx::query(
+    let rows = sqlx::query(
         r#"
         UPDATE reminders
         SET completed = true
